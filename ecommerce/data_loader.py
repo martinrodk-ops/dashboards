@@ -1,5 +1,5 @@
 """
-Módulo para carga y gestión de datos desde Google Drive a SQLite
+Module for loading and managing data from Google Drive to SQLite
 """
 import sqlite3
 import pandas as pd
@@ -14,10 +14,10 @@ class DataLoader:
     
     @st.cache_resource
     def load_database(_self):
-        """Carga todos los datos desde Google Drive a SQLite"""
+        """Load all data from Google Drive to SQLite"""
         _self.conn = sqlite3.connect(_self.db_name)
         
-        st.info("📥 Iniciando carga de datos desde Google Drive...")
+        st.info("📥 Starting data load from Google Drive...")
         progress_bar = st.progress(0)
         status_text = st.empty()
         
@@ -25,29 +25,29 @@ class DataLoader:
         
         for i, (table_name, url) in enumerate(_self.file_urls.items()):
             try:
-                status_text.text(f"📋 Cargando {table_name}...")
+                status_text.text(f"📋 Loading {table_name}...")
                 
-                # Descargar y cargar CSV
+                # Download and load CSV
                 df = pd.read_csv(url)
                 df.to_sql(table_name, _self.conn, if_exists='replace', index=False)
                 
                 progress_bar.progress((i + 1) / total_files)
                 
             except Exception as e:
-                st.error(f"❌ Error cargando {table_name}: {str(e)}")
+                st.error(f"❌ Error loading {table_name}: {str(e)}")
                 continue
         
-        status_text.text("✅ ¡Base de datos cargada exitosamente!")
+        status_text.text("✅ Database loaded successfully!")
         return _self.conn
     
     def get_connection(self):
-        """Retorna la conexión a la base de datos"""
+        """Return database connection"""
         if self.conn is None:
             self.conn = self.load_database()
         return self.conn
     
     def get_table_info(self):
-        """Obtiene información de las tablas en la base de datos"""
+        """Get information about tables in the database"""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
@@ -62,5 +62,5 @@ class DataLoader:
         
         return table_info
 
-# Instancia global del cargador de datos
+# Global instance of the data loader
 data_loader = DataLoader()
