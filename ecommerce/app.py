@@ -1,63 +1,63 @@
 """
-Dashboard Principal de E-commerce Brasil
+Main E-commerce Brazil Dashboard
 """
 import streamlit as st
 from data_loader import data_loader
 import components as comp
 
-# Configuración de la página
+# Page configuration
 st.set_page_config(
-    page_title="Dashboard E-commerce Brasil",
+    page_title="E-commerce Brazil Dashboard",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Título principal
-st.title("📊 Dashboard de Análisis E-commerce - Brasil")
+# Main title
+st.title("📊 E-commerce Brazil Analysis Dashboard")
 st.markdown("---")
 
-# Sidebar - Navegación
-st.sidebar.header("🧭 Navegación")
+# Sidebar - Navigation
+st.sidebar.header("🧭 Navigation")
 
-# Opciones de análisis
+# Analysis options
 analysis_options = {
-    "📊 Resumen General": comp.show_overview,
-    "🏢 Ventas por Estado": comp.show_sales_analysis, 
-    "⏰ Análisis Temporal": comp.show_temporal_analysis,
-    "💳 Métodos de Pago": comp.show_payment_analysis,
-    "📦 Análisis de Productos": comp.show_product_analysis,
-    "😊 Satisfacción del Cliente": comp.show_satisfaction_analysis
+    "📊 Overview": comp.show_overview,
+    "🏢 Sales by State": comp.show_sales_analysis, 
+    "⏰ Temporal Analysis": comp.show_temporal_analysis,
+    "💳 Payment Methods": comp.show_payment_analysis,
+    "📦 Product Analysis": comp.show_product_analysis,
+    "😊 Customer Satisfaction": comp.show_satisfaction_analysis
 }
 
 selected_analysis = st.sidebar.radio(
-    "Selecciona el análisis:",
+    "Select analysis:",
     list(analysis_options.keys())
 )
 
-# Sidebar - Información de la base de datos
+# Sidebar - Database information
 st.sidebar.markdown("---")
-st.sidebar.header("🗃️ Base de Datos")
+st.sidebar.header("🗃️ Database")
 
-if st.sidebar.checkbox("Mostrar estructura de tablas"):
+if st.sidebar.checkbox("Show table structure"):
     table_info = data_loader.get_table_info()
     for table_name, columns in table_info.items():
         with st.sidebar.expander(f"📁 {table_name}"):
             for col_name, col_type in columns:
                 st.sidebar.write(f"  ├─ {col_name} ({col_type})")
 
-# Sidebar - Información del proyecto
+# Sidebar - Project information
 st.sidebar.markdown("---")
-st.sidebar.header("ℹ️ Información")
+st.sidebar.header("ℹ️ Information")
 st.sidebar.info(
-    "Este dashboard analiza datos de e-commerce brasileño. "
-    "Los datos se cargan automáticamente desde Google Drive."
+    "This dashboard analyzes Brazilian e-commerce data. "
+    "Data is automatically loaded from Google Drive."
 )
 
-# Cargar datos
+# Load data
 conn = data_loader.get_connection()
 
-# Mostrar el análisis seleccionado
+# Display selected analysis
 if selected_analysis in analysis_options:
     analysis_function = analysis_options[selected_analysis]
     analysis_function(conn)
@@ -65,6 +65,6 @@ if selected_analysis in analysis_options:
 # Footer
 st.markdown("---")
 st.markdown(
-    "📊 *Dashboard desarrollado con Streamlit | "
-    "Datos: Brazilian E-commerce Public Dataset*"
+    "📊 *Dashboard developed with Streamlit | "
+    "Data: Brazilian E-commerce Public Dataset*"
 )
