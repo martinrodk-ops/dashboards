@@ -1,15 +1,9 @@
+"""
+Dashboard Principal de E-commerce Brasil
+"""
 import streamlit as st
-import pandas as pd
-import plotly.express as px
-from data_loader import get_database_connection
-
-# Importar componentes
-from components.overview import show_overview
-from components.sales_analysis import show_sales_analysis
-from components.temporal_analysis import show_temporal_analysis
-from components.payment_analysis import show_payment_analysis
-from components.product_analysis import show_product_analysis
-from components.satisfaction_analysis import show_satisfaction_analysis
+from data_loader import data_loader
+import components as comp
 
 # Configuración de la página
 st.set_page_config(
@@ -20,68 +14,57 @@ st.set_page_config(
 )
 
 # Título principal
-st.title("📊 Dashboard de Análisis - E-commerce Brasileño")
+st.title("📊 Dashboard de Análisis E-commerce - Brasil")
 st.markdown("---")
 
-# Barra lateral para navegación
-st.sidebar.title("🌎 Navegación")
-st.sidebar.markdown("Selecciona una sección del análisis:")
+# Sidebar - Navegación
+st.sidebar.header("🧭 Navegación")
 
-# Cargar datos con spinner
-with st.spinner('🔄 Cargando datos... Esto puede tomar unos segundos'):
-    conn = get_database_connection()
+# Opciones de análisis
+analysis_options = {
+    "📊 Resumen General": comp.show_overview,
+    "🏢 Ventas por Estado": comp.show_sales_analysis, 
+    "⏰ Análisis Temporal": comp.show_temporal_analysis,
+    "💳 Métodos de Pago": comp.show_payment_analysis,
+    "📦 Análisis de Productos": comp.show_product_analysis,
+    "😊 Satisfacción del Cliente": comp.show_satisfaction_analysis
+}
 
-# Menú de navegación en sidebar
-opcion = st.sidebar.radio(
-    "Secciones del Dashboard:",
-    [
-        "📈 Resumen Ejecutivo",
-        "🌎 Ventas por Estado", 
-        "📅 Análisis Temporal",
-        "💳 Métodos de Pago",
-        "📦 Productos y Categorías",
-        "😊 Satisfacción del Cliente"
-    ]
+selected_analysis = st.sidebar.radio(
+    "Selecciona el análisis:",
+    list(analysis_options.keys())
 )
 
-# Mostrar la sección seleccionada
-if opcion == "📈 Resumen Ejecutivo":
-    show_overview(conn)
-    
-elif opcion == "🌎 Ventas por Estado":
-    show_sales_analysis(conn)
-    
-elif opcion == "📅 Análisis Temporal":
-    show_temporal_analysis(conn)
-    
-elif opcion == "💳 Métodos de Pago":
-    show_payment_analysis(conn)
-    
-elif opcion == "📦 Productos y Categorías":
-    show_product_analysis(conn)
-    
-elif opcion == "😊 Satisfacción del Cliente":
-    show_satisfaction_analysis(conn)
-
-# Información adicional en el sidebar
+# Sidebar - Información de la base de datos
 st.sidebar.markdown("---")
+st.sidebar.header("🗃️ Base de Datos")
+
+if st.sidebar.checkbox("Mostrar estructura de tablas"):
+    table_info = data_loader.get_table_info()
+    for table_name, columns in table_info.items():
+        with st.sidebar.expander(f"📁 {table_name}"):
+            for col_name, col_type in columns:
+                st.sidebar.write(f"  ├─ {col_name} ({col_type})")
+
+# Sidebar - Información del proyecto
+st.sidebar.markdown("---")
+st.sidebar.header("ℹ️ Información")
 st.sidebar.info(
-    """
-    **💡 Información del Dashboard:**
-    - Datos: Brazilian E-commerce
-    - Período: 2016-2018
-    - Total de pedidos analizados: ~100k
-    - Fuente: Olist Store
-    """
+    "Este dashboard analiza datos de e-commerce brasileño. "
+    "Los datos se cargan automáticamente desde Google Drive."
 )
+
+# Cargar datos
+conn = data_loader.get_connection()
+
+# Mostrar el análisis seleccionado
+if selected_analysis in analysis_options:
+    analysis_function = analysis_options[selected_analysis]
+    analysis_function(conn)
 
 # Footer
 st.markdown("---")
 st.markdown(
-    """
-    <div style='text-align: center; color: gray;'>
-        Dashboard desarrollado con Streamlit y Plotly | Datos: Olist Brazilian E-commerce
-    </div>
-    """,
-    unsafe_allow_html=True
+    "📊 *Dashboard desarrollado con Streamlit | "
+    "Datos: Brazilian E-commerce Public Dataset*"
 )
