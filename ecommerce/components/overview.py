@@ -1,29 +1,44 @@
 """
-Overview Component
+Overview Component with Viridis Theme - CORRECTED
 """
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+from utils.helpers import apply_viridis_style, format_currency, format_number, format_integer
 
 def show_overview(conn):
     st.header("📊 E-commerce Overview")
     
-    # Queries for main metrics
+    # Get main metrics
     metrics = get_overview_metrics(conn)
     
-    # Display metrics in columns
+    # Display metrics in columns with Viridis colors
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("📦 Delivered Orders", f"{metrics['total_orders']:,}")
+        st.metric(
+            "📦 Delivered Orders", 
+            format_integer(metrics['total_orders'])
+        )
     
     with col2:
-        st.metric("👥 Unique Customers", f"{metrics['unique_customers']:,}")
+        st.metric(
+            "👥 Unique Customers", 
+            format_integer(metrics['unique_customers'])
+        )
     
     with col3:
-        st.metric("💰 Total Revenue", f"${metrics['total_revenue']:,.2f}")
+        st.metric(
+            "💰 Total Revenue", 
+            format_currency(metrics['total_revenue'])
+        )
     
     with col4:
-        st.metric("📚 Unique Products", f"{metrics['unique_products']:,}")
+        st.metric(
+            "📚 Unique Products", 
+            format_integer(metrics['unique_products'])
+        )
     
     st.markdown("---")
     
@@ -31,21 +46,72 @@ def show_overview(conn):
     col5, col6, col7, col8 = st.columns(4)
     
     with col5:
-        st.metric("🏪 Active Sellers", f"{metrics['active_sellers']:,}")
+        st.metric("🏪 Active Sellers", format_integer(metrics['active_sellers']))
     
     with col6:
-        st.metric("📈 Average Ticket", f"${metrics['avg_ticket']:.2f}")
+        st.metric("📈 Average Ticket", format_currency(metrics['avg_ticket']))
     
     with col7:
-        st.metric("🔄 Orders/Customer", f"{metrics['orders_per_customer']:.2f}")
+        # Calculate and show Revenue per Customer directly
+        revenue_per_customer = metrics['total_revenue'] / max(metrics['unique_customers'], 1)
+        st.metric("💰 Revenue per Customer", format_currency(revenue_per_customer))
     
     with col8:
-        st.metric("⭐ Average Review Score", f"{metrics['avg_review_score']:.2f}")
+        # Corrected format for review score
+        review_score = metrics['avg_review_score']
+        if review_score == int(review_score):
+            formatted_score = str(int(review_score))
+        else:
+            formatted_score = f"{review_score:.1f}"
+        st.metric("⭐ Avg Review Score", formatted_score)
     
-    # Detailed summary table
-    st.subheader("📋 Detailed Statistics")
-    summary_df = create_summary_table(metrics)
-    st.dataframe(summary_df, use_container_width=True)
+    # Performance indicators - ONLY VALID INDICATORS
+    st.subheader("📈 Performance Indicators")
+    
+    # MEANINGFUL CALCULATIONS - Only revenue efficiency and service quality
+    perf_data = {
+        'Metric': ['Revenue Efficiency', 'Service Quality'],
+        'Value': [
+            # Revenue Efficiency: Revenue per customer vs reasonable target
+            min((metrics['total_revenue'] / max(metrics['unique_customers'], 1)) / 500 * 100, 100),
+            
+            # Service Quality: Convert 5-star scale to percentage
+            min(metrics['avg_review_score'] / 5 * 100, 100)
+        ]
+    }
+    
+    perf_df = pd.DataFrame(perf_data)
+    
+    fig = go.Figure()
+    
+    # Use Viridis colors correctly
+    viridis_colors = px.colors.sequential.Viridis
+    
+    for i, row in perf_df.iterrows():
+        fig.add_trace(go.Bar(
+            x=[row['Value']],
+            y=[row['Metric']],
+            orientation='h',
+            name=row['Metric'],
+            marker_color=viridis_colors[i * 3 % len(viridis_colors)],
+            hovertemplate=f"<b>{row['Metric']}</b><br>Score: {row['Value']:.1f}%<extra></extra>"
+        ))
+    
+    fig = apply_viridis_style(fig, "Business Performance Metrics")
+    fig.update_layout(
+        showlegend=False, 
+        height=200,
+        title={
+            'text': "Business Performance Metrics",
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': {'size': 16}
+        }
+    )
+    fig.update_xaxes(range=[0, 100], title_text="Score (%)")
+    
+    st.plotly_chart(fig, use_container_width=True)
 
 def get_overview_metrics(conn):
     """Get main metrics for the overview"""
@@ -83,12 +149,6 @@ def get_overview_metrics(conn):
                 GROUP BY oi.order_id
             ) sub
         """,
-        'orders_per_customer': """
-            SELECT COUNT(DISTINCT o.order_id) / COUNT(DISTINCT c.customer_unique_id) 
-            FROM orders o 
-            JOIN customers c ON o.customer_id = c.customer_id 
-            WHERE o.order_status = 'delivered'
-        """,
         'avg_review_score': """
             SELECT AVG(review_score) 
             FROM order_reviews
@@ -104,30 +164,3 @@ def get_overview_metrics(conn):
             metrics[key] = 0
     
     return metrics
-
-def create_summary_table(metrics):
-    """Create formatted summary table"""
-    summary_data = {
-        'Metric': [
-            'Total Delivered Orders',
-            'Unique Registered Customers', 
-            'Total Generated Revenue',
-            'Products in Catalog',
-            'Registered Sellers',
-            'Average Ticket per Order',
-            'Orders per Customer (Average)',
-            'Review Score (Average)'
-        ],
-        'Value': [
-            f"{metrics['total_orders']:,}",
-            f"{metrics['unique_customers']:,}",
-            f"${metrics['total_revenue']:,.2f}",
-            f"{metrics['unique_products']:,}",
-            f"{metrics['active_sellers']:,}",
-            f"${metrics['avg_ticket']:.2f}",
-            f"{metrics['orders_per_customer']:.2f}",
-            f"{metrics['avg_review_score']:.2f}/5.0"
-        ]
-    }
-    
-    return pd.DataFrame(summary_data)

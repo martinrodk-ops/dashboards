@@ -1,11 +1,12 @@
 """
-Customer Satisfaction Analysis Component
+Customer Satisfaction Analysis Component with Viridis Theme - CORREGIDO
 """
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from utils.helpers import apply_custom_style
+from plotly.subplots import make_subplots
+from utils.helpers import apply_viridis_style, get_viridis_color, format_currency, format_number
 
 def show_satisfaction_analysis(conn):
     st.header("😊 Customer Satisfaction Analysis")
@@ -17,110 +18,249 @@ def show_satisfaction_analysis(conn):
         st.warning("No satisfaction data found.")
         return
     
-    # Quick metrics
+    # Quick metrics - CORREGIDO: cálculo correcto del promedio
     col1, col2, col3 = st.columns(3)
     with col1:
-        avg_score = df_satisfaction['review_score'].mean()
-        st.metric("⭐ Average Review Score", f"{avg_score:.2f}")
-    with col2:
+        # CORRECCIÓN: Calcular promedio ponderado por cantidad de reviews
         total_reviews = df_satisfaction['total_reviews'].sum()
+        weighted_sum = (df_satisfaction['review_score'] * df_satisfaction['total_reviews']).sum()
+        avg_score = weighted_sum / total_reviews if total_reviews > 0 else 0
+        formatted_avg = f"{avg_score:.1f}"
+        st.metric("⭐ Average Review Score", formatted_avg)
+    
+    with col2:
         st.metric("📝 Total Reviews", f"{total_reviews:,}")
+    
     with col3:
         most_common_score = df_satisfaction.loc[df_satisfaction['total_reviews'].idxmax(), 'review_score']
-        st.metric("🎯 Most Common Score", most_common_score)
+        st.metric("🎯 Most Common Score", str(most_common_score))
     
     st.markdown("---")
     
-    # Review score distribution
-    st.subheader("📊 Review Score Distribution")
+    # CONFIGURACIÓN DE SUBPLOTS CON ESPACIADO OPTIMIZADO
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=(
+            'Distribution of Review Scores', 
+            'Average Price vs Review Score',
+            'Average Shipping Cost vs Review Score', 
+            'Price vs Shipping Cost by Review Score'
+        ),
+        specs=[
+            [{"type": "bar"}, {"type": "scatter"}],
+            [{"type": "scatter"}, {"type": "scatter"}]
+        ],
+        vertical_spacing=0.15,
+        horizontal_spacing=0.10,
+        row_heights=[0.5, 0.5]
+    )
     
-    col1, col2 = st.columns(2)
+    # Viridis colors for review scores
+    n_scores = len(df_satisfaction)
+    colors = [get_viridis_color(i, n_scores) for i in range(n_scores)]
     
-    with col1:
-        # Bar chart
-        fig = px.bar(df_satisfaction, x='review_score', y='total_reviews',
-                     color='total_reviews', color_continuous_scale='viridis',
-                     labels={'total_reviews': 'Total Reviews', 'review_score': 'Review Score'})
-        fig = apply_custom_style(fig, "Review Score Distribution")
-        st.plotly_chart(fig, use_container_width=True)
+    # Chart 1: Distribution of Review Scores (Bar)
+    fig.add_trace(
+        go.Bar(
+            x=df_satisfaction['review_score'],
+            y=df_satisfaction['total_reviews'],
+            marker_color=colors,
+            marker_line=dict(color='#E0E0E0', width=1),
+            hovertemplate='<b>Review Score: %{x}</b><br>Total Reviews: %{y:,}<extra></extra>',
+            showlegend=False
+        ),
+        row=1, col=1
+    )
     
-    with col2:
-        # Pie chart
-        fig = px.pie(df_satisfaction, values='total_reviews', names='review_score',
-                     hover_data=['average_order_price'])
-        fig = apply_custom_style(fig, "Percentage by Review Score")
-        st.plotly_chart(fig, use_container_width=True)
+    # Chart 2: Average Price vs Review Score
+    fig.add_trace(
+        go.Scatter(
+            x=df_satisfaction['review_score'],
+            y=df_satisfaction['average_order_price'],
+            mode='lines+markers',
+            line=dict(color=px.colors.sequential.Viridis[0], width=3),
+            marker=dict(size=8, line=dict(color='#E0E0E0', width=1)),
+            hovertemplate='<b>Review Score: %{x}</b><br>Average Price: $%{customdata:.1f}<extra></extra>',
+            customdata=df_satisfaction['average_order_price'],
+            showlegend=False
+        ),
+        row=1, col=2
+    )
     
-    # Relationship between price and satisfaction
-    st.subheader("💲 Relationship: Price vs Satisfaction")
+    # Chart 3: Average Shipping Cost vs Review Score
+    fig.add_trace(
+        go.Scatter(
+            x=df_satisfaction['review_score'],
+            y=df_satisfaction['average_shipping_cost'],
+            mode='lines+markers',
+            line=dict(color=px.colors.sequential.Viridis[2], width=3),
+            marker=dict(size=8, line=dict(color='#E0E0E0', width=1)),
+            hovertemplate='<b>Review Score: %{x}</b><br>Average Shipping Cost: $%{customdata:.1f}<extra></extra>',
+            customdata=df_satisfaction['average_shipping_cost'],
+            showlegend=False
+        ),
+        row=2, col=1
+    )
     
-    col3, col4 = st.columns(2)
+    # Chart 4: Price vs Shipping Cost by Review Score
+    fig.add_trace(
+        go.Scatter(
+            x=df_satisfaction['average_order_price'],
+            y=df_satisfaction['average_shipping_cost'],
+            mode='markers',
+            marker=dict(
+                size=df_satisfaction['review_score'] * 8 + 10,
+                color=df_satisfaction['review_score'],
+                colorscale='Viridis',
+                line=dict(color='#E0E0E0', width=1),
+                showscale=True,
+                colorbar=dict(title="Review Score", titleside="right")
+            ),
+            text=df_satisfaction['review_score'],
+            hovertemplate='<b>Review Score: %{text}</b><br>Average Price: $%{customdata[0]:.1f}<br>Average Shipping Cost: $%{customdata[1]:.1f}<extra></extra>',
+            customdata=df_satisfaction[['average_order_price', 'average_shipping_cost']],
+            showlegend=False
+        ),
+        row=2, col=2
+    )
     
-    with col3:
-        # Average price vs review score
-        fig = px.scatter(df_satisfaction, x='review_score', y='average_order_price',
-                         size='total_reviews', color='review_score',
-                         trendline="lowess",
-                         labels={'average_order_price': 'Average Order Price ($)', 
-                                'review_score': 'Review Score'})
-        fig = apply_custom_style(fig, "Average Price vs Review Score")
-        st.plotly_chart(fig, use_container_width=True)
+    # LAYOUT MEJORADO
+    fig.update_layout(
+        height=800,
+        showlegend=False,
+        title={
+            'text': "Customer Satisfaction Analysis",
+            'x': 0.5,
+            'y': 0.999,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': {'size': 20, 'color': '#440154', 'family': "Segoe UI, sans-serif"}
+        },
+        margin=dict(t=100, b=60, l=60, r=60, pad=10)
+    )
     
-    with col4:
-        # Shipping cost vs review score
-        fig = px.scatter(df_satisfaction, x='review_score', y='average_freight_value',
-                         size='total_reviews', color='review_score',
-                         trendline="lowess",
-                         labels={'average_freight_value': 'Average Shipping Cost ($)',
-                                'review_score': 'Review Score'})
-        fig = apply_custom_style(fig, "Shipping Cost vs Review Score")
-        st.plotly_chart(fig, use_container_width=True)
+    # Aplicar estilo Viridis base
+    fig = apply_viridis_style(fig)
     
-    # Analysis by state
+    # Update axes
+    fig.update_xaxes(title_text="Review Score", row=1, col=1)
+    fig.update_yaxes(title_text="Total Reviews", row=1, col=1)
+    fig.update_xaxes(title_text="Review Score", row=1, col=2)
+    fig.update_yaxes(title_text="Average Price ($)", row=1, col=2)
+    fig.update_xaxes(title_text="Review Score", row=2, col=1)
+    fig.update_yaxes(title_text="Average Shipping Cost ($)", row=2, col=1)
+    fig.update_xaxes(title_text="Average Price ($)", row=2, col=2)
+    fig.update_yaxes(title_text="Average Shipping Cost ($)", row=2, col=2)
+    
+    # CONFIGURACIÓN DE TÍTULOS DE SUBPLOTS - MEJORADA
+    for i, annotation in enumerate(fig.layout.annotations):
+        col_pos = 0.23 if i % 2 == 0 else 0.78
+        row_pos = 1.045 if i < 2 else 0.475
+        
+        annotation.update(
+            text=annotation.text,
+            x=col_pos,
+            y=row_pos,
+            xanchor='center',
+            yanchor='top',
+            font=dict(size=14, color="#440154", family="Segoe UI, sans-serif"),
+            xref='paper',
+            yref='paper'
+        )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # ESPACIADO ENTRE SECCIONES
+    st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+    
+    # GRÁFICOS INDIVIDUALES UNO DEBAJO DEL OTRO, OCUPANDO TODO EL ANCHO
+    
+    # Sección 1: Satisfaction by State (ocupa todo el ancho)
     st.subheader("🏢 Satisfaction by State")
     
     df_satisfaction_state = get_satisfaction_by_state(conn)
     
     if not df_satisfaction_state.empty:
-        col5, col6 = st.columns(2)
+        state_fig = px.bar(
+            df_satisfaction_state, 
+            x='state', 
+            y='average_review_score',
+            color='average_review_score',
+            color_continuous_scale='Viridis',
+            labels={'average_review_score': 'Average Score', 'state': 'State'}
+        )
         
-        with col5:
-            # Average review score by state
-            fig = px.bar(df_satisfaction_state, x='state', y='average_review_score',
-                         color='average_review_score', color_continuous_scale='plasma',
-                         labels={'average_review_score': 'Average Review Score', 
-                                'state': 'State'})
-            fig = apply_custom_style(fig, "Average Review Score by State")
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col6:
-            # Reviews by state heatmap
-            st.subheader("📈 Reviews by State")
-            display_df = df_satisfaction_state[['state', 'total_reviews', 'average_review_score']].copy()
-            display_df['average_review_score'] = display_df['average_review_score'].round(2)
-            display_df = display_df.sort_values('average_review_score', ascending=False)
-            st.dataframe(display_df, use_container_width=True)
+        # Aplicar estilo manualmente SIN usar apply_viridis_style
+        state_fig.update_layout(
+            height=250,  # Altura ajustada a 250
+            margin=dict(t=30, b=60, l=60, r=30),
+            showlegend=False,
+            xaxis_title="State",
+            yaxis_title="Average Review Score",  # Etiqueta del eje Y agregada
+            font=dict(size=10),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+        )
+        state_fig.update_traces(
+            hovertemplate='<b>State: %{x}</b><br>Average Score: %{customdata:.1f}<extra></extra>',
+            customdata=df_satisfaction_state['average_review_score']
+        )
+        state_fig.update_xaxes(
+            tickangle=45, 
+            tickfont=dict(size=9),
+            gridcolor='rgba(128,128,128,0.2)'
+        )
+        state_fig.update_yaxes(
+            tickfont=dict(size=9),
+            gridcolor='rgba(128,128,128,0.2)'
+        )
+        st.plotly_chart(state_fig, use_container_width=True)
     
-    # Temporal satisfaction analysis
-    st.subheader("⏰ Temporal Satisfaction Evolution")
+    # ESPACIADO ENTRE SECCIONES
+    st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+    
+    # Sección 2: Satisfaction Over Time (ocupa todo el ancho)
+    st.subheader("⏰ Satisfaction Over Time")
     
     df_satisfaction_temporal = get_satisfaction_temporal(conn)
     
     if not df_satisfaction_temporal.empty:
-        fig = px.line(df_satisfaction_temporal, x='month', y='average_review_score',
-                      markers=True, line_shape='linear',
-                      labels={'average_review_score': 'Average Review Score', 'month': 'Month'})
-        fig = apply_custom_style(fig, "Satisfaction Evolution Over Time")
-        fig.update_xaxes(tickangle=45)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Complete data table
-    st.subheader("📋 Detailed Satisfaction Data")
-    display_df = df_satisfaction.copy()
-    display_df['average_order_price'] = display_df['average_order_price'].apply(lambda x: f"${x:.2f}")
-    display_df['average_freight_value'] = display_df['average_freight_value'].apply(lambda x: f"${x:.2f}")
-    
-    st.dataframe(display_df, use_container_width=True)
+        temporal_fig = px.line(
+            df_satisfaction_temporal, 
+            x='month', 
+            y='average_review_score',
+            markers=True, 
+            line_shape='linear',
+            labels={'average_review_score': 'Average Score', 'month': 'Month'}
+        )
+        
+        # Aplicar estilo manualmente SIN usar apply_viridis_style
+        temporal_fig.update_layout(
+            height=250,  # Altura ajustada a 250
+            margin=dict(t=30, b=70, l=60, r=30),
+            showlegend=False,
+            xaxis_title="Month",
+            yaxis_title="Average Review Score",  # Etiqueta del eje Y agregada
+            font=dict(size=10),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+        )
+        temporal_fig.update_traces(
+            hovertemplate='<b>Month: %{x}</b><br>Average Score: %{customdata:.1f}<extra></extra>',
+            customdata=df_satisfaction_temporal['average_review_score'],
+            line=dict(width=2),
+            marker=dict(size=4)
+        )
+        temporal_fig.update_xaxes(
+            tickangle=45, 
+            tickfont=dict(size=9),
+            gridcolor='rgba(128,128,128,0.2)'
+        )
+        temporal_fig.update_yaxes(
+            tickfont=dict(size=9),
+            gridcolor='rgba(128,128,128,0.2)'
+        )
+        st.plotly_chart(temporal_fig, use_container_width=True)
 
 def get_satisfaction_data(conn):
     """Get customer satisfaction data"""
@@ -129,7 +269,7 @@ def get_satisfaction_data(conn):
         orr.review_score as review_score,
         COUNT(*) as total_reviews,
         AVG(oi.price) as average_order_price,
-        AVG(oi.freight_value) as average_freight_value
+        AVG(oi.freight_value) as average_shipping_cost
     FROM order_reviews orr
     JOIN orders o ON orr.order_id = o.order_id
     JOIN order_items oi ON o.order_id = oi.order_id

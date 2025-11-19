@@ -1,11 +1,12 @@
 """
-Temporal Analysis Component
+Temporal Analysis Component with Viridis Theme
 """
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from utils.helpers import apply_custom_style
+from plotly.subplots import make_subplots
+from utils.helpers import apply_viridis_style, format_currency, format_number
 
 def show_temporal_analysis(conn):
     st.header("⏰ Temporal Sales Analysis")
@@ -24,147 +25,146 @@ def show_temporal_analysis(conn):
         max_date = df_temporal['month'].max()
         st.info(f"📅 Data period: {min_date} to {max_date}")
     
-    with col2:
-        selected_metric = st.selectbox(
-            "📊 Select main metric:",
-            ['total_revenue', 'total_orders', 'average_price', 'unique_customers'],
-            format_func=lambda x: {
-                'total_revenue': 'Total Revenue',
-                'total_orders': 'Total Orders', 
-                'average_price': 'Average Price',
-                'unique_customers': 'Unique Customers'
-            }[x]
-        )
-    
     # Main evolution chart
-    st.subheader("📈 Main Temporal Evolution")
+    st.subheader("📈 Temporal Evolution")
     
-    fig = go.Figure()
+    # Create subplots for comprehensive analysis
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=(
+            'Revenue Evolution Over Time', 
+            'Orders Evolution Over Time',
+            'Seasonality - Average Revenue by Month', 
+            'Unique Customers Evolution'
+        ),
+        specs=[
+            [{"type": "scatter"}, {"type": "scatter"}],
+            [{"type": "bar"}, {"type": "scatter"}]
+        ],
+        vertical_spacing=0.22,  # Adjusted spacing for better balance
+        horizontal_spacing=0.1
+    )
     
-    # Configure colors and metrics
-    metric_config = {
-        'total_revenue': {'color': '#1f77b4', 'name': 'Revenue', 'suffix': '$', 'format': ',.0f'},
-        'total_orders': {'color': '#ff7f0e', 'name': 'Orders', 'suffix': '', 'format': ',.0f'},
-        'average_price': {'color': '#2ca02c', 'name': 'Average Price', 'suffix': '$', 'format': '.2f'},
-        'unique_customers': {'color': '#d62728', 'name': 'Unique Customers', 'suffix': '', 'format': ',.0f'}
-    }
+    # Viridis colors
+    colors = px.colors.sequential.Viridis
     
-    config = metric_config[selected_metric]
+    # Chart 1: Revenue Evolution
+    fig.add_trace(
+        go.Scatter(
+            x=df_temporal['month'],
+            y=df_temporal['total_revenue'],
+            mode='lines+markers',
+            line=dict(color=colors[0], width=3),
+            marker=dict(size=6, line=dict(color='#E0E0E0', width=1)),
+            hovertemplate='<b>%{x}</b><br>Total Revenue: $%{y:,.0f}<extra></extra>',
+            showlegend=False,
+            name='Revenue'
+        ),
+        row=1, col=1
+    )
     
-    fig.add_trace(go.Scatter(
-        x=df_temporal['month'],
-        y=df_temporal[selected_metric],
-        mode='lines+markers',
-        name=config['name'],
-        line=dict(color=config['color'], width=3),
-        marker=dict(size=6),
-        hovertemplate=f"<b>%{{x}}</b><br>{config['name']}: {config['suffix']}%{{y:{config['format']}}}<extra></extra>"
-    ))
+    # Chart 2: Orders Evolution
+    fig.add_trace(
+        go.Scatter(
+            x=df_temporal['month'],
+            y=df_temporal['total_orders'],
+            mode='lines+markers',
+            line=dict(color=colors[2], width=3),
+            marker=dict(size=6, line=dict(color='#E0E0E0', width=1)),
+            hovertemplate='<b>%{x}</b><br>Total Orders: %{y:,}<extra></extra>',
+            showlegend=False,
+            name='Orders'
+        ),
+        row=1, col=2
+    )
     
-    fig = apply_custom_style(fig, f"Evolution of {config['name']}")
-    fig.update_xaxes(tickangle=45)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Trend metrics
-    st.subheader("📊 Trend Metrics")
-    
-    if len(df_temporal) > 1:
-        # Calculate growth metrics
-        first_value = df_temporal[selected_metric].iloc[0]
-        last_value = df_temporal[selected_metric].iloc[-1]
-        growth = ((last_value - first_value) / first_value) * 100 if first_value != 0 else 0
-        
-        # Calculate CAGR (if enough data)
-        if len(df_temporal) >= 2:
-            periods = len(df_temporal) - 1
-            cagr = ((last_value / first_value) ** (1/periods) - 1) * 100 if first_value != 0 else 0
-        else:
-            cagr = 0
-        
-        col3, col4, col5, col6 = st.columns(4)
-        
-        with col3:
-            st.metric(f"{config['name']} Initial", 
-                     f"{config['suffix']}{first_value:{config['format']}}")
-        with col4:
-            st.metric(f"{config['name']} Final", 
-                     f"{config['suffix']}{last_value:{config['format']}}",
-                     delta=f"{growth:+.1f}%")
-        with col5:
-            avg_value = df_temporal[selected_metric].mean()
-            st.metric(f"Monthly Average", f"{config['suffix']}{avg_value:{config['format']}}")
-        with col6:
-            st.metric("Annualized Growth", f"{cagr:+.1f}%")
-    
-    # Comparative charts
-    st.subheader("📊 Metrics Comparison")
-    
-    # Normalize metrics for comparison
-    df_normalized = df_temporal.copy()
-    for col in ['total_revenue', 'total_orders', 'unique_customers']:
-        if col in df_normalized.columns and df_normalized[col].max() > 0:
-            df_normalized[f'{col}_normalized'] = df_normalized[col] / df_normalized[col].max()
-    
-    fig = go.Figure()
-    
-    if 'total_revenue_normalized' in df_normalized.columns:
-        fig.add_trace(go.Scatter(
-            x=df_normalized['month'], y=df_normalized['total_revenue_normalized'],
-            mode='lines', name='Revenue (normalized)', line=dict(width=2)
-        ))
-    
-    if 'total_orders_normalized' in df_normalized.columns:
-        fig.add_trace(go.Scatter(
-            x=df_normalized['month'], y=df_normalized['total_orders_normalized'],
-            mode='lines', name='Orders (normalized)', line=dict(width=2)
-        ))
-    
-    if 'unique_customers_normalized' in df_normalized.columns:
-        fig.add_trace(go.Scatter(
-            x=df_normalized['month'], y=df_normalized['unique_customers_normalized'],
-            mode='lines', name='Customers (normalized)', line=dict(width=2)
-        ))
-    
-    fig = apply_custom_style(fig, "Metrics Comparison (Normalized)")
-    fig.update_xaxes(tickangle=45)
-    fig.update_yaxes(title_text="Normalized Value (0-1)")
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Seasonality analysis
-    st.subheader("📅 Seasonality Analysis")
-    
+    # Chart 3: Seasonality (Average revenue by month)
     df_temporal['month_num'] = pd.to_datetime(df_temporal['month']).dt.month
     seasonality = df_temporal.groupby('month_num').agg({
         'total_revenue': 'mean',
         'total_orders': 'mean',
+        'average_price': 'mean',
         'unique_customers': 'mean'
     }).reset_index()
     
-    col7, col8 = st.columns(2)
+    fig.add_trace(
+        go.Bar(
+            x=seasonality['month_num'],
+            y=seasonality['total_revenue'],
+            marker_color=colors[4],
+            marker_line=dict(color='#E0E0E0', width=1),
+            hovertemplate='<b>Month: %{x}</b><br>Average Revenue: $%{y:,.0f}<extra></extra>',
+            showlegend=False,
+            name='Avg Revenue'
+        ),
+        row=2, col=1
+    )
     
-    with col7:
-        fig = px.bar(seasonality, x='month_num', y='total_revenue',
-                     labels={'month_num': 'Month of the Year', 'total_revenue': 'Average Revenue ($)'})
-        fig = apply_custom_style(fig, "Seasonality - Average Revenue by Month")
-        st.plotly_chart(fig, use_container_width=True)
+    # Chart 4: Unique Customers
+    fig.add_trace(
+        go.Scatter(
+            x=df_temporal['month'],
+            y=df_temporal['unique_customers'],
+            mode='lines+markers',
+            line=dict(color=colors[6], width=3),
+            marker=dict(size=6, line=dict(color='#E0E0E0', width=1)),
+            hovertemplate='<b>%{x}</b><br>Unique Customers: %{y:,}<extra></extra>',
+            showlegend=False,
+            name='Unique Customers'
+        ),
+        row=2, col=2
+    )
     
-    with col8:
-        fig = px.line(seasonality, x='month_num', y='total_orders', markers=True,
-                     labels={'month_num': 'Month of the Year', 'total_orders': 'Average Orders'})
-        fig = apply_custom_style(fig, "Seasonality - Average Orders by Month")
-        st.plotly_chart(fig, use_container_width=True)
+    # Update layout with Viridis style
+    fig = apply_viridis_style(fig, "Comprehensive Temporal Analysis", height=800)
     
-    # Data table
-    st.subheader("📋 Detailed Monthly Data")
-    display_df = df_temporal.copy()
+    # Update axes
+    fig.update_xaxes(title_text="Month", row=1, col=1, tickangle=45)
+    fig.update_yaxes(title_text="Total Revenue ($)", row=1, col=1)
+    fig.update_xaxes(title_text="Month", row=1, col=2, tickangle=45)
+    fig.update_yaxes(title_text="Total Orders", row=1, col=2)
+    fig.update_xaxes(title_text="Month of Year", row=2, col=1)
+    fig.update_yaxes(title_text="Average Revenue ($)", row=2, col=1)
+    fig.update_xaxes(title_text="Month", row=2, col=2, tickangle=45)
+    fig.update_yaxes(title_text="Unique Customers", row=2, col=2)
     
-    # Format numeric columns
-    if 'total_revenue' in display_df.columns:
-        display_df['total_revenue'] = display_df['total_revenue'].apply(lambda x: f"${x:,.2f}")
-    if 'average_price' in display_df.columns:
-        display_df['average_price'] = display_df['average_price'].apply(lambda x: f"${x:.2f}")
+    # Update subplot titles with better positioning
+    for annotation in fig.layout.annotations:
+        annotation.update(
+            font=dict(size=14, color="#440154", family="Segoe UI, sans-serif"),
+            y=annotation.y + 0.02  # Move titles up slightly
+        )
     
-    st.dataframe(display_df, use_container_width=True)
+    # Add more spacing between the main title and subplots
+    fig.update_layout(
+        margin=dict(t=120, b=80),  # Adjusted margins for better balance
+        title_y=0.95  # Position title closer to the top
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Additional average price chart
+    st.subheader("💲 Average Price Evolution")
+    
+    price_fig = go.Figure()
+    
+    price_fig.add_trace(
+        go.Scatter(
+            x=df_temporal['month'],
+            y=df_temporal['average_price'],
+            mode='lines+markers',
+            line=dict(color=colors[3], width=3),
+            marker=dict(size=6, line=dict(color='#E0E0E0', width=1)),
+            hovertemplate='<b>%{x}</b><br>Average Price: $%{y:.2f}<extra></extra>',
+            name='Average Price'
+        )
+    )
+    
+    price_fig = apply_viridis_style(price_fig, "Average Price Evolution Over Time")
+    price_fig.update_xaxes(tickangle=45)
+    price_fig.update_layout(showlegend=False, height=400)
+    
+    st.plotly_chart(price_fig, use_container_width=True)
 
 def get_temporal_data(conn):
     """Get data aggregated by month"""
