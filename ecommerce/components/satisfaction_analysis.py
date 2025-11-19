@@ -44,7 +44,7 @@ def show_satisfaction_analysis(conn):
             'Distribution of Review Scores', 
             'Average Price vs Review Score',
             'Average Shipping Cost vs Review Score', 
-            'Price vs Shipping Cost by Review Score'
+            'Average Shipping Cost vs Price by Review Score'
         ),
         specs=[
             [{"type": "bar"}, {"type": "scatter"}],
