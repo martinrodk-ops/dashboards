@@ -114,7 +114,7 @@ def show_satisfaction_analysis(conn):
                 colorscale='Viridis',
                 line=dict(color='#E0E0E0', width=1),
                 showscale=True,
-                colorbar=dict(title="Review Score", titleside="right")
+                colorbar=dict(title="Review Score")
             ),
             text=df_satisfaction['review_score'],
             hovertemplate='<b>Review Score: %{text}</b><br>Average Price: $%{customdata[0]:.1f}<br>Average Shipping Cost: $%{customdata[1]:.1f}<extra></extra>',
