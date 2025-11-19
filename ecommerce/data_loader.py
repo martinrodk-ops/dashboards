@@ -1,3 +1,6 @@
+"""
+Module for loading and managing data from Google Drive to SQLite - CORREGIDO
+"""
 import sqlite3
 import pandas as pd
 import streamlit as st
@@ -10,38 +13,49 @@ class DataLoader:
 
     @st.cache_resource
     def load_database(_self):
-        """Cargar todos los datos desde Google Drive a SQLite"""
+        """Load all data to SQLite - CORREGIDO con mejor manejo de errores"""
         conn = sqlite3.connect(_self.db_name)
         
-        st.info("📥 Iniciando carga de datos desde Google Drive...")
+        st.info("📥 Loading datasets...")
         progress_bar = st.progress(0)
         status_text = st.empty()
         
         total_files = len(_self.file_urls)
+        loaded_tables = []
+        failed_tables = []
         
         for i, (table_name, url) in enumerate(_self.file_urls.items()):
             try:
-                status_text.text(f"📋 Cargando {table_name}...")
+                status_text.text(f"📋 Loading {table_name}...")
                 
-                # Descargar y cargar CSV
+                # Download and load CSV
                 df = pd.read_csv(url)
                 df.to_sql(table_name, conn, if_exists='replace', index=False)
+                loaded_tables.append(table_name)
                 
                 progress_bar.progress((i + 1) / total_files)
                 
             except Exception as e:
-                st.error(f"❌ Error cargando {table_name}: {str(e)}")
+                st.error(f"❌ Error loading {table_name}: {str(e)}")
+                failed_tables.append(table_name)
                 continue
         
-        conn.close()  # ¡Importante: cerrar la conexión!
-        status_text.text("✅ ¡Base de datos cargada exitosamente!")
+        conn.close()
+        
+        # Mostrar resumen de carga
+        if loaded_tables:
+            st.success(f"✅ Successfully loaded {len(loaded_tables)} tables")
+        if failed_tables:
+            st.warning(f"⚠️ Failed to load {len(failed_tables)} tables: {', '.join(failed_tables)}")
+        
+        status_text.text("✅ Database loading completed!")
 
     def get_db_path(self):
         return self.db_name
 
     def create_connection(self):
-        """Crear una nueva conexión para el thread actual"""
+        """Create a new connection for the current thread"""
         return sqlite3.connect(self.db_name)
 
-# Instancia global del cargador de datos
+# Global instance of the data loader
 data_loader = DataLoader()
