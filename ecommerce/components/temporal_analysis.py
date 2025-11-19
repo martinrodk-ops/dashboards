@@ -142,29 +142,6 @@ def show_temporal_analysis(conn):
     )
     
     st.plotly_chart(fig, use_container_width=True)
-    
-    # Additional average price chart
-    st.subheader("💲 Average Price Evolution")
-    
-    price_fig = go.Figure()
-    
-    price_fig.add_trace(
-        go.Scatter(
-            x=df_temporal['month'],
-            y=df_temporal['average_price'],
-            mode='lines+markers',
-            line=dict(color=colors[3], width=3),
-            marker=dict(size=6, line=dict(color='#E0E0E0', width=1)),
-            hovertemplate='<b>%{x}</b><br>Average Price: $%{y:.2f}<extra></extra>',
-            name='Average Price'
-        )
-    )
-    
-    price_fig = apply_viridis_style(price_fig, "Average Price Evolution Over Time")
-    price_fig.update_xaxes(tickangle=45)
-    price_fig.update_layout(showlegend=False, height=400)
-    
-    st.plotly_chart(price_fig, use_container_width=True)
 
 def get_temporal_data(conn):
     """Get data aggregated by month"""
